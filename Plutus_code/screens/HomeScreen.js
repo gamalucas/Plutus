@@ -1,16 +1,15 @@
 /* eslint-disable prettier/prettier */
 import React, {useState, useContext, useRef, useEffect} from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
 import { Modalize } from 'react-native-modalize';
-import firestore, { firebase } from '@react-native-firebase/firestore';
 
 import FormInput from '../components/FormInput';
 import FormButton from '../components/FormButton';
 import { AuthContext } from '../navigation/AuthProvider';
-
 import PositionCard from '../components/PositionCard';
-import HoldingCard from '../components/HoldingCard';
-import { block } from 'react-native-reanimated';
+import AssetDecorator from '../utils/AssetDecorator';
+import Firebase from '../utils/Firebase';
+
 
 const HomeScreen = ({navigation}) => {
   const {user, logout} = useContext(AuthContext); //get user info and data - to get user ID for example {user.uid}
@@ -22,80 +21,100 @@ const HomeScreen = ({navigation}) => {
   const [loading, setLoading] = useState(true);
   const [holdingList, setHoldingList] = useState([]);
 
-  const modalizeRef = useRef(null);
 
-  const addAssets = async () => {
-    console.log('Got to addAssets func');
-    console.log('Ticker' + ticker);
-    console.log('Num shares' + numShares);
-    console.log('Avg Price' + avgPrice);
-    console.log('Tag' + tag);
-    firestore().collection('assets').add({
-      userId: user.uid,
-      ticker: ticker,
-      numShare: numShares,
-      avgPrice: avgPrice,
-      tag: tag,
-    })
-    .then(() => {
-      console.log('Added Asset');
-      Alert.alert( //delete later
-        'Asset published!',
-        'Your Asset has been published Successfully!',
-      );
+  var Singleton = (function () {
+    var modalizeRef;
+
+    function createInstance() {
+        const modalizeRef = useRef(null);
+        return modalizeRef;
+    }
+
+    return {
+        getInstance: function (open) {
+            if (!modalizeRef) {
+              modalizeRef = createInstance();
+            }
+            if (open === true){
+              modalizeRef.current?.open();
+            }
+            return modalizeRef;
+        }
+    };
+  })();
+
+  const checker = async() => {
+    var assetAlreadyExist = false;
+    var indexTemp = 0;
+
+    for (var i = 0; i < holdingList.length; i++){
+      if (ticker === holdingList[i].ticker){
+        assetAlreadyExist = true;
+        indexTemp = i;
+        var getAssetFirebaseID = holdingList[i].assetFirebaseID;
+      }
+    }
+    if (assetAlreadyExist) {
+      // make an async update to the holdingList
+      await (async function() {
+        const items = [...holdingList];
+        const item = { ...holdingList[indexTemp] };
+        item.numShare = parseInt(numShares) + parseInt(item.numShare);
+        items[indexTemp] = item;
+        console.log('result =', items);
+        setHoldingList(items);
+      })();
+      console.log(holdingList);
+
+
+      //decorate asset obj here
+      var numSharesUpdate = new AssetDecorator(holdingList[indexTemp], numShares); //THIS IS AN EXAMPLE OF DECORATOR PATTERN
+      numSharesUpdate.decorateAsset();
+
+      //update asset on Firebase
+      Firebase.updateAsset(getAssetFirebaseID, holdingList, indexTemp);
+
       setTicker(null);
       setNumShares(null);
       setAvgPrice(null);
       setTag(null);
-    })
-    .catch((error) => {
-      console.log('Something went wrong with added post to firestore.', error);
-    });
+    }
+    else {
+      // add the new asset
+      const docID = await Firebase.handleAdd(user, ticker, numShares, avgPrice, tag);
+      console.log('Doc ID: ' + docID);
+      // search for the new asset
+      const newAsset = await Firebase.handleFetchDocument(docID);
+      console.log('New Asset: ' + newAsset);
+      await (async function() {
+        const newList = [...holdingList, newAsset];
+        setHoldingList(newList);
+      })();
+    }
   };
 
   useEffect(() => {
-    const fetchData = async() => {
-      try {
-        const list = [];
-        await firestore()
-        .collection('assets')
-        .where('userId', '==', user.uid)
-        .get()
-        .then((querySnapshot) => {
-          querySnapshot.forEach(doc => {
-            const {ticker, numShare, avgPrice, tag, userId} = doc.data();
-            list.push({
-              ticker: ticker,
-              numShare: numShare,
-              avgPrice: avgPrice,
-              tag: tag,
-              userId: userId,
-             });
-          });
-        });
-        setHoldingList(list);
-        if (loading){
-          setLoading(false);
-        }
-        console.log('Assets: ', holdingList);
-      } catch (e) {
-        console.log('Fetch error is: ', e);
-      }
-    };
-    fetchData();
-  }, []);
+    Firebase.fetchData(user).then(querySnapshot => {
+      const list = [];
+      querySnapshot.forEach(doc => {
+        const nextAsset = Firebase.createObject(doc);
+        list.push(nextAsset);
+      });
+      setHoldingList(list);
+      setLoading(false);
+    });
+  }, [user]);
 
   return (
+    <SafeAreaView>
       <View style={styles.container}>
-          <Text> Home Screen </Text>
-          {/* <PositionCard holdings={holdingList}/> */}
-          {/* {console.log('TEST: ' + holdingList.map(block => PositionCard(block)))} */}
-          {holdingList.map((holdingList, key) => <HoldingCard key={key} ticker={holdingList.ticker} numShares={holdingList.numShare}/>)}
-          <FormButton buttonTitle="Add Position" onPress={() => modalizeRef.current?.open()} />
+          <PositionCard  holdingList={holdingList}/>
+          <FormButton buttonTitle="Add Position" onPress={() => Singleton.getInstance(true)} />
 
-          <Modalize ref={modalizeRef} snapPoint={250}>
+
+          <Modalize ref={Singleton.getInstance(false)} snapPoint={500}>
             <View style={styles.container}>
-              <Text style={styles.titleText}> Add Position </Text>
+              <Text style={styles.titleText}> Add a new position </Text>
               <FormInput
                 value={ticker}
                 onChangeText={(ticekerValue) => setTicker(ticekerValue)}
@@ -122,12 +141,12 @@ const HomeScreen = ({navigation}) => {
                 placeholder="Tag"
                 autoCorrect={false}
               />
-              <FormButton buttonTitle="Save" onPress={addAssets}/>
+              <FormButton buttonTitle="Save" onPress={checker}/>
             </View>
           </Modalize>
-
           <FormButton buttonTitle="Logout" onPress={() => logout()} />
       </View>
+    </SafeAreaView>
   );
 };
 
@@ -144,4 +163,4 @@ const styles = StyleSheet.create({
       paddingBottom: 20,
       fontSize: 25,
     },
-  });
+});
