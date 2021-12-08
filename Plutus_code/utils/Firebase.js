@@ -1,14 +1,19 @@
-/* eslint-disable prettier/prettier */
-import firestore, { firebase } from '@react-native-firebase/firestore';
+import firestore, {firebase} from '@react-native-firebase/firestore';
 
 class Firebase {
   static addAssets(user, ticker, numShares, avgPrice, tag) {
-    firestore().collection('assets').add({
-      userId: user.uid,
-      ticker: ticker,
+    firestore()
+      .collection('assets')
+      .add({
+        userId: user.uid,
+        ticker: ticker,
         numShare: numShares,
         avgPrice: avgPrice,
         tag: tag,
+      })
+      .then(res => {
+        console.log('asset added');
+        console.log(res);
       });
   }
 
@@ -18,9 +23,7 @@ class Firebase {
         return res.id;
       },
     );
-
   }
-
 
   static fetchData(user) {
     return firestore()
@@ -35,7 +38,6 @@ class Firebase {
       res.forEach(doc => {
         newAsset = Firebase.createObject(doc);
       });
-      // console.log(newAsset);
       return newAsset;
     });
   }
@@ -60,43 +62,37 @@ class Firebase {
   }
 
   static editAsset(assetFirebaseID, changeNumSharesVal, changeTagVal) {
-    if (changeNumSharesVal != null){
+    if (changeNumSharesVal != null) {
       firestore()
-      .collection('assets')
-      .doc(assetFirebaseID)
-      .update({
-        numShare: changeNumSharesVal,
-      })
-      .then(() => {
-        console.log('Asset updated correctly');
-      });
+        .collection('assets')
+        .doc(assetFirebaseID)
+        .update({
+          numShare: changeNumSharesVal,
+        })
+        .then(() => {
+          console.log('Asset updated correctly');
+        });
     }
-    if (changeTagVal != null){
+    if (changeTagVal != null) {
       firestore()
-      .collection('assets')
-      .doc(assetFirebaseID)
-      .update({
-        tag: changeTagVal,
-      })
-      .then(() => {
-        console.log('Asset updated correctly');
-      });
+        .collection('assets')
+        .doc(assetFirebaseID)
+        .update({
+          tag: changeTagVal,
+        })
+        .then(() => {
+          console.log('Asset updated correctly');
+        });
+    } else {
+      console.log('Error updating assets');
     }
-    else {
-      console.log('Error uopdating assets');
-    }
-
   }
 
   static deleteAsset(assetFirebaseID) {
-    if (assetFirebaseID == null){
+    if (assetFirebaseID == null) {
       console.log('Error: asset id not found');
-    }
-    else {
-      firestore()
-      .collection('assets')
-      .doc(assetFirebaseID)
-      .delete();
+    } else {
+      firestore().collection('assets').doc(assetFirebaseID).delete();
     }
   }
 

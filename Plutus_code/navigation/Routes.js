@@ -8,23 +8,23 @@ import {AuthContext} from './AuthProvider';
 import AuthStack from './AuthStack';
 import AppStack from './AppStack';
 
-
 const Routes = () => {
 
     const {user, setUser} = useContext(AuthContext);
     const [initializing, setInitializing] = useState(true);
 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     const onAuthStateChanged = (user) => {
         setUser(user);
-        if (initializing) setInitializing(false);
-    }
+        if (initializing) {setInitializing(false);}
+    };
 
     useEffect(() => {
         const subscriber = auth().onAuthStateChanged(onAuthStateChanged);
         return subscriber;
-    }, []);
+    }, [onAuthStateChanged]);
 
-    if (initializing) return null;
+    if (initializing) {return null;}
 
     return (
         <NavigationContainer>

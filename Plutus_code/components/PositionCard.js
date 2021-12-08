@@ -4,6 +4,7 @@ import {StyleSheet, View, Text, FlatList} from 'react-native';
 import HoldingCard from './HoldingCard';
 import TickerInfo from '../utils/TickerInfo';
 import formatter from '../utils/NumberFormatter';
+
 class PositionCard extends Component {
   state = {
     position: 0,
@@ -16,6 +17,8 @@ class PositionCard extends Component {
     this.yourFunction();
   }
 
+  // total up the current value of all positions
+  // update the state so this change is reflected to the user
   updatePosition = () => {
     let sum = 0;
     for (const key in this.state.holdings) {
@@ -31,11 +34,12 @@ class PositionCard extends Component {
     });
   };
 
+  // make API request for each ticker and get the latest price
+  // update the price to reflect the latest in the state holding list
   updatePrices = () => {
     for (const key in this.state.holdings) {
       TickerInfo.getData(this.state.holdings[key].ticker)
         .then(res => {
-          // console.log(this.state);
           let items = [...this.state.holdings];
           let item = {...items[key]};
           item.currPrice = res.data.c;
@@ -43,18 +47,20 @@ class PositionCard extends Component {
           this.setState({holdings: items}, () => this.updatePosition());
         })
         .catch(error => {
-          console.log('price call failed with: ' + error);
+          console.log('price call failed with following error: ' + error);
         });
     }
   };
 
+  // find the position where the the number of shares or avg price change
+  // update the state to reflect that
   checkUpdate = newList => {
     for (const key in this.state.holdings) {
       if (
         this.state.holdings[key].numShare !== newList[key].numShare ||
         this.state.holdings[key].avgPrice !== newList[key].avgPrice
       ) {
-        console.log('updating something');
+        // update the state of the holdings so list actively updates
         let items = [...this.state.holdings];
         let updatedItem = {...this.state.holdings[key]};
         updatedItem.numShare = newList[key].numShare;
@@ -72,9 +78,8 @@ class PositionCard extends Component {
     }
   };
 
+  // listen for changes to the props
   componentDidUpdate = props => {
-    // console.log('hello from update');
-    // console.log(props.holdingList);
     if (this.state.holdings !== null) {
       if (this.state.holdings.length !== props.holdingList.length) {
         this.setState(
@@ -109,13 +114,14 @@ class PositionCard extends Component {
     setTimeout(this.yourFunction, 15000);
   };
 
+  // helper function to render each HoldingCard in the list
   renderItem = ({item}) => <HoldingCard key={item.id} data={item} />;
 
   render() {
     return (
       <View style={styles.container}>
         <View style={styles.position}>
-          <Text style={styles.positionFont}>Hi Hyden  </Text>
+          <Text style={styles.positionFont}>Hey there  </Text>
           <Text style={styles.positionFont}>
             {formatter.format(this.state.position)}
           </Text>
